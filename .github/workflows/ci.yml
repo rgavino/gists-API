@@ -22,11 +22,24 @@ jobs:
   # Fastest checks first, so mistakes fail in seconds.
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      # --exit-zero so findings still get uploaded; the lint step below is the gate.
+      - name: Generate Ruff SARIF report
+        run: pipx run ruff check --exit-zero --output-format=sarif --output-file=ruff.sarif .
+      # Pull requests from forks get a read-only token and can't upload.
+      - name: Upload Ruff results to code scanning
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ruff.sarif
+          category: ruff
       - name: Lint Python (includes SAST)
         run: pipx run ruff check --output-format=github .
       - name: Lint Dockerfile
