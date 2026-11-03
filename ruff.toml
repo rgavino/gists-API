@@ -1,0 +1,7 @@
+[lint]
+# Default rules plus the flake8-bandit security rules (SAST).
+extend-select = ["S"]
+
+[lint.per-file-ignores]
+# Tests call our own local test server with urlopen.
+"test_app.py" = ["S310"]

@@ -1,0 +1,75 @@
+name: Deploy
+
+# Reusable: called once per environment by ci.yml. The same image digest is
+# promoted through every environment, so UAT runs exactly what DEV tested.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image:
+        description: Image reference pinned by digest (registry/name@sha256:...)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Protection rules (e.g. required reviewers on uat) are set on the
+    # environment in repo settings, and pause the job here until approved.
+    environment: ${{ inputs.environment }}
+    # Never run two deploys to the same environment at once, and never cancel
+    # one half way through.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      IMAGE: ${{ inputs.image }}
+      ENV_NAME: ${{ inputs.environment }}
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Pull release image
+        run: docker pull "$IMAGE"
+
+      # Moving the environment tag records what is deployed where.
+      - name: Promote image to ${{ inputs.environment }}
+        run: |
+          repo="${IMAGE%@*}"
+          docker tag "$IMAGE" "$repo:$ENV_NAME"
+          docker push "$repo:$ENV_NAME"
+
+      # Stand-in for a real target (Cloud Run, ECS, k8s...): runs the image
+      # with this environment's config. GISTS_GITHUB_TOKEN is an optional
+      # environment secret; GitHub reserves the GITHUB_ prefix for secret names.
+      - name: Deploy
+        run: |
+          docker run -d --name app -p 8080:8080 \
+            -e GITHUB_TOKEN="$GISTS_GITHUB_TOKEN" \
+            "$IMAGE"
+        env:
+          GISTS_GITHUB_TOKEN: ${{ secrets.GISTS_GITHUB_TOKEN }}
+
+      - name: Smoke test
+        run: |
+          for _ in $(seq 1 10); do
+            curl -fsS http://localhost:8080/healthz && break
+            sleep 1
+          done
+          echo
+          curl -fsS http://localhost:8080/healthz | grep -q '"ok"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/not--valid)" = "404"
+
+      - name: Summary
+        if: success()
+        run: echo "Deployed \`$IMAGE\` to **$ENV_NAME**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Container logs
+        if: always()
+        run: docker logs app || true

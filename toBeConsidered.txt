@@ -1,0 +1,12 @@
+TOPIC 1: Settings and configure-ability
+TOPIC 2: Pagination - next and last page URLs not yet implemented
+         Cut down Gist summary vs All Gist fields
+TOPIC 3: Security. It stops path injection. Without the check, a request like /../orgs/x could make the server call a different GitHub URL than intended. The urllib.parse.quote on app.py:38 adds a second layer of protection.         
+TOPIC 4: Gaps you could mention if asked
+
+        The tests run against python app.py, not the built container. A good addition would be a smoke test that runs curl localhost:8080/octocat against the built Docker image. I was doing this by hand in the background run that's stuck on Docker.
+        There's no CI pipeline. A small GitHub Actions workflow could run the tests and docker build on every push. It's optional and cheap, and it signals good operability habits, but it's also more to explain. Your call.
+
+
+
+git remote add origin https://github.com/rgavino/equal-experts.git

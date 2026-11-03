@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [solution]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: read-only by default; jobs that publish images add packages: write.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: gists-api:${{ github.sha }}
+
+jobs:
+  # Fastest checks first, so mistakes fail in seconds.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Lint Python (includes SAST)
+        run: pipx run ruff check --output-format=github .
+      - name: Lint Dockerfile
+        run: docker run --rm -i hadolint/hadolint:v2.12.0 < Dockerfile
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Unit tests (fake GitHub API)
+        run: python -m unittest -v
+        env:
+          SKIP_INTEGRATION: "1"
+      - name: Unit tests with coverage
+        run: |
+          python -m pip install coverage==7.17.0
+          python -m coverage run --branch --source=app -m unittest -v
+          python -m coverage report -m --fail-under=80
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SKIP_INTEGRATION: "1"
+
+  # Calls the real GitHub API, so it can fail for reasons outside our control
+  # (outage, rate limit). It reports, but does not block the build.
+  # Unauthenticated: the Actions token is an app token, which GitHub rejects
+  # on the user gists endpoint with a 403.
+  integration:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Integration test (real GitHub API)
+        run: python -m unittest -v
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      # The test stage sits on the runtime layers, so the tests run against the
+      # shipped image without test files being left in it.
+      - name: Unit tests inside the image
+        run: docker build --target test .
+
+      - name: Start container
+        run: docker run -d --name app -p 8080:8080 "$IMAGE"
+
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            curl -fsS http://localhost:8080/healthz && break
+            sleep 1
+          done
+          echo
+          curl -fsS http://localhost:8080/healthz | grep -q '"ok"'
+          # Invalid username is rejected without calling GitHub.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/not--valid)" = "404"
+
+      - name: Container logs
+        if: always()
+        run: docker logs app || true
+
+      # Only pushes and manual runs publish; pull requests stop at CI.
+      - name: Push image to GHCR
+        id: push
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker tag "$IMAGE" "$repo:${{ github.sha }}"
+          docker push "$repo:${{ github.sha }}"
+          # Deploys pull by digest, so a re-pushed tag can't change what ships.
+          # The image also carries a digest under its local name, so pick the GHCR one.
+          ref=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repo:${{ github.sha }}" | grep -m1 "^$repo@")
+          echo "image=$ref" >> "$GITHUB_OUTPUT"
+
+  # CD: the image built above is promoted unchanged, DEV first, then UAT.
+  deploy-dev:
+    needs: build
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      environment: dev
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit
+
+  # Waits for approval if the uat environment has required reviewers.
+  deploy-uat:
+    needs: [build, deploy-dev]
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      environment: uat
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit
