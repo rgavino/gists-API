@@ -2,7 +2,7 @@
 
 GET /<user>                      -> JSON list of the user's public gists
 GET /<user>?page=2&per_page=10   -> paginated (passed through to GitHub)
-GET /healthz                     -> liveness check   
+GET /healthz                     -> liveness check      
 """
 
 import json
