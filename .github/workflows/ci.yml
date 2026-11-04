@@ -155,3 +155,15 @@ jobs:
       environment: uat
       image: ${{ needs.build.outputs.image }}
     secrets: inherit
+
+    # Waits for approval if the prd environment has required reviewers.
+  deploy-uat:
+    needs: [build, deploy-uat]
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      environment: prd
+      image: ${{ needs.build.outputs.image }}
+    secrets: inherit
