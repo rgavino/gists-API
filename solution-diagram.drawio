@@ -1,0 +1,242 @@
+<mxfile host="drawio" version="24.7.17">
+  <diagram id="overview" name="1. Solution overview">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="o-title" value="&lt;b&gt;Gists API — request flow (app.py)&lt;/b&gt;" style="text;html=1;fontSize=18;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="600" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-docker" value="&lt;b&gt;Docker container&lt;/b&gt; (python:3.12-slim, port 8080) — app.py, stdlib only" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="200" y="60" width="840" height="580" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-client" value="&lt;b&gt;Client&lt;/b&gt;&lt;br&gt;curl /octocat" style="shape=actor;whiteSpace=wrap;html=1;verticalLabelPosition=bottom;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="60" y="100" width="40" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-server" value="&lt;b&gt;ThreadingHTTPServer&lt;/b&gt;&lt;br&gt;0.0.0.0:PORT&lt;br&gt;one thread per request" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="230" y="100" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-life" value="&lt;b&gt;Lifecycle &amp;amp; config&lt;/b&gt;&lt;br&gt;• SIGTERM (docker stop) → KeyboardInterrupt → server_close() waits for in-flight requests&lt;br&gt;• Env: PORT, GITHUB_API, GITHUB_TOKEN (optional, raises rate limit)&lt;br&gt;• Logs go to logger &quot;gists&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="230" y="220" width="220" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-d1" value="path == healthz?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="520" y="95" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="o-d2" value="matches&lt;br&gt;USERNAME_RE?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="520" y="205" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="o-d3" value="page / per_page&lt;br&gt;valid?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="520" y="315" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="o-fetch" value="&lt;b&gt;fetch_gists(user, page, per_page)&lt;/b&gt;&lt;br&gt;urlopen(GITHUB_API/users/&amp;lt;user&amp;gt;/gists)&lt;br&gt;timeout 10s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="500" y="440" width="200" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-r200h" value="200 {&quot;status&quot;: &quot;ok&quot;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="760" y="110" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="o-r404" value="404 not found&lt;br&gt;&lt;i&gt;GitHub is never called&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="760" y="220" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="o-r400" value="400 invalid page / per_page&lt;br&gt;&lt;i&gt;(per_page silently capped at 100)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="760" y="330" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="o-map" value="&lt;b&gt;Response mapping&lt;/b&gt;&lt;br&gt;GitHub 200 → &lt;b&gt;200&lt;/b&gt; summarised list&lt;br&gt;&amp;nbsp;&amp;nbsp;(id, description, url, files, created_at, updated_at)&lt;br&gt;GitHub 404 → &lt;b&gt;404&lt;/b&gt; user not found&lt;br&gt;GitHub 403 / 429 → &lt;b&gt;503&lt;/b&gt; rate limited + WARNING log&lt;br&gt;&amp;nbsp;&amp;nbsp;(includes x-ratelimit-remaining / reset)&lt;br&gt;Other GitHub error → &lt;b&gt;502&lt;/b&gt; + WARNING log&lt;br&gt;URLError / timeout → &lt;b&gt;502&lt;/b&gt; + ERROR log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="760" y="420" width="260" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-github" value="&lt;b&gt;GitHub REST API&lt;/b&gt;&lt;br&gt;api.github.com&lt;br&gt;GET /users/{user}/gists" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="230" width="190" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="o-e1" value="GET /&amp;lt;user&amp;gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-client" target="o-server">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e2" value="Handler.do_GET" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-server" target="o-d1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e3" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d1" target="o-r200h">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e4" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d1" target="o-d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e5" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d2" target="o-r404">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e6" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d2" target="o-d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e7" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d3" target="o-r400">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e8" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-d3" target="o-fetch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e9" value="HTTPS (+ Bearer token if set)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="o-fetch" target="o-github">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="670" />
+              <mxPoint x="1175" y="670" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="o-e10" value="result / exception" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="o-fetch" target="o-map">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="o-e11" value="JSON response (send_json)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="o-r200h" target="o-client">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="885" y="50" />
+              <mxPoint x="80" y="50" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="tests" name="2. How the unit tests work">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1450" pageHeight="1150" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="t-title" value="&lt;b&gt;test_app.py — real server, fake GitHub&lt;/b&gt;&amp;nbsp;&amp;nbsp;(python -m unittest -v)" style="text;html=1;fontSize=18;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="800" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-proc" value="&lt;b&gt;One Python test process&lt;/b&gt; (no network needed for TestWithMockedGitHub)" style="rounded=1;arcSize=2;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="20" y="50" width="1120" height="710" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-lane-test" value="&lt;b&gt;Test thread&lt;/b&gt; (unittest)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="40" y="90" width="320" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="t-lane-srv" value="&lt;b&gt;Server thread&lt;/b&gt; (daemon) — real app.Handler, unmodified" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="760" y="90" width="360" height="400" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-setupclass" value="&lt;b&gt;setUpClass&lt;/b&gt; (once per test class)&lt;br&gt;ThreadingHTTPServer(&quot;127.0.0.1&quot;, &lt;b&gt;0&lt;/b&gt;) → OS picks a free port → base_url&lt;br&gt;serve_forever() on a daemon thread" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="t-setup" value="&lt;b&gt;setUp&lt;/b&gt; (before each test)&lt;br&gt;• mock.patch(&quot;urllib.request.urlopen&quot;, side_effect=&lt;b&gt;router&lt;/b&gt;)&lt;br&gt;• self.calls = []&lt;br&gt;• self.github = fake returning [OCTOCAT_GIST]&lt;br&gt;• addCleanup(patcher.stop)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="230" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="t-arrange" value="&lt;b&gt;Arrange&lt;/b&gt; (optional, per test)&lt;br&gt;github_error(404 / 403 / 500, headers)&lt;br&gt;or self.github = unreachable" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="350" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="t-act" value="&lt;b&gt;Act&lt;/b&gt;: self.get(&quot;/octocat&quot;)&lt;br&gt;→ urllib.request.urlopen(base_url + path)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="440" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="t-assert" value="&lt;b&gt;Assert&lt;/b&gt;&lt;br&gt;• HTTP status + JSON body&lt;br&gt;• self.calls → URL sent to GitHub (page / per_page),&lt;br&gt;&amp;nbsp;&amp;nbsp;or [] = GitHub was never called&lt;br&gt;• assertLogs(&quot;gists&quot;, WARNING / ERROR)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="610" width="280" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-router" value="&lt;b&gt;Patched urllib.request.urlopen&lt;/b&gt;&lt;br&gt;→ router(request)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="430" y="250" width="240" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="t-decide" value="URL starts with&lt;br&gt;base_url?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="470" y="350" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="t-fake" value="&lt;b&gt;Fake GitHub&lt;/b&gt; = self.github(request)&lt;br&gt;• default: BytesIO(json [OCTOCAT_GIST])&lt;br&gt;• github_error(status): raise HTTPError&lt;br&gt;• unreachable: raise URLError" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="410" y="560" width="280" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-handler" value="&lt;b&gt;app.Handler.do_GET&lt;/b&gt;&lt;br&gt;healthz / username regex / page validation&lt;br&gt;&lt;i&gt;can answer 200 / 404 / 400 without calling GitHub&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="780" y="130" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="t-fetch" value="&lt;b&gt;app.fetch_gists&lt;/b&gt;&lt;br&gt;urllib.request.urlopen(api.github.com/users/…/gists)&lt;br&gt;maps errors → 404 / 503 / 502, logs to &quot;gists&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="780" y="300" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="t-resp" value="&lt;b&gt;send_json&lt;/b&gt;(status, body)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="780" y="420" width="320" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-why" value="&lt;b&gt;Why a router, not a plain mock?&lt;/b&gt;&lt;br&gt;The test client and the app both call urllib.request.urlopen. Patching it outright would also intercept the test's own request to the server.&lt;br&gt;&lt;br&gt;router() checks the URL: loopback calls to base_url go to the &lt;b&gt;real&lt;/b&gt; urlopen; everything else is recorded in self.calls and answered by the fake." style="shape=note;whiteSpace=wrap;html=1;size=16;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="90" width="250" height="230" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-real" value="&lt;b&gt;Real api.github.com&lt;/b&gt;&lt;br&gt;Only TestAgainstRealGitHub (no patch).&lt;br&gt;Skipped when SKIP_INTEGRATION=1" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="370" width="250" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-e0a" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="t-setupclass" target="t-setup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e0b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="t-setup" target="t-arrange">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e0c" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="t-arrange" target="t-act">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e0d" value="patches" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-setup" target="t-router">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-e1" value="&lt;b&gt;1&lt;/b&gt;. test request" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-act" target="t-router">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="390" y="470" />
+              <mxPoint x="390" y="330" />
+              <mxPoint x="490" y="330" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t-e1b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="t-router" target="t-decide">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e2" value="&lt;b&gt;2&lt;/b&gt;. yes → real urlopen&lt;br&gt;(real HTTP over loopback)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#6c8ebf;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-router" target="t-handler">
+          <mxGeometry x="0.2" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t-e2b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="t-handler" target="t-fetch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e3" value="&lt;b&gt;3&lt;/b&gt;. app calls GitHub&lt;br&gt;via the &lt;i&gt;same&lt;/i&gt; patched urlopen" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#82b366;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-fetch" target="t-router">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e4" value="&lt;b&gt;4&lt;/b&gt;. no → self.calls.append(url)&lt;br&gt;then self.github(request)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;" edge="1" parent="1" source="t-decide" target="t-fake">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e5" value="&lt;b&gt;5&lt;/b&gt;. JSON bytes / HTTPError / URLError" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-fake" target="t-fetch">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="605" />
+              <mxPoint x="720" y="400" />
+              <mxPoint x="860" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t-e5b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-fetch" target="t-resp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="t-e6" value="&lt;b&gt;6&lt;/b&gt;. HTTP response (status, JSON)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;strokeColor=#82b366;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="t-resp" target="t-assert">
+          <mxGeometry x="0.3" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="940" y="700" />
+              <mxPoint x="400" y="700" />
+              <mxPoint x="400" y="665" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="t-e7" value="integration test only" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#666666;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="t-fetch" target="t-real">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="t-cat" value="&lt;table border=&quot;1&quot; cellpadding=&quot;4&quot; style=&quot;border-collapse:collapse;width:100%;font-size:12px&quot;&gt;&lt;tr style=&quot;background:#eeeeee&quot;&gt;&lt;th align=&quot;left&quot;&gt;Test&lt;/th&gt;&lt;th align=&quot;left&quot;&gt;Fake GitHub set to&lt;/th&gt;&lt;th align=&quot;left&quot;&gt;Request&lt;/th&gt;&lt;th align=&quot;left&quot;&gt;Asserts&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_lists_gists&lt;/td&gt;&lt;td&gt;default [OCTOCAT_GIST]&lt;/td&gt;&lt;td&gt;/octocat&lt;/td&gt;&lt;td&gt;200, summarised body, calls[0] has page=1&amp;amp;per_page=30&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_pagination_passed_through&lt;/td&gt;&lt;td&gt;default&lt;/td&gt;&lt;td&gt;?page=2&amp;amp;per_page=5&lt;/td&gt;&lt;td&gt;calls[0] has page=2&amp;amp;per_page=5&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_per_page_capped_at_100&lt;/td&gt;&lt;td&gt;default&lt;/td&gt;&lt;td&gt;?per_page=500&lt;/td&gt;&lt;td&gt;calls[0] has per_page=100&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_invalid_pagination&lt;/td&gt;&lt;td&gt;default&lt;/td&gt;&lt;td&gt;?page=abc&lt;/td&gt;&lt;td&gt;400, calls == [] (GitHub not called)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_unknown_user&lt;/td&gt;&lt;td&gt;HTTPError 404&lt;/td&gt;&lt;td&gt;/no-such-user&lt;/td&gt;&lt;td&gt;404 &quot;not found&quot;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_rate_limited&lt;/td&gt;&lt;td&gt;HTTPError 403 + ratelimit headers&lt;/td&gt;&lt;td&gt;/octocat&lt;/td&gt;&lt;td&gt;503, WARNING log with remaining=0, reset=…&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_upstream_failure&lt;/td&gt;&lt;td&gt;HTTPError 500&lt;/td&gt;&lt;td&gt;/octocat&lt;/td&gt;&lt;td&gt;502, WARNING log&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_upstream_unreachable&lt;/td&gt;&lt;td&gt;URLError&lt;/td&gt;&lt;td&gt;/octocat&lt;/td&gt;&lt;td&gt;502, ERROR log&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_invalid_username_not_forwarded&lt;/td&gt;&lt;td&gt;default&lt;/td&gt;&lt;td&gt;/, /bad_name, /-leading, /a/b&lt;/td&gt;&lt;td&gt;404 each, calls == []&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;test_healthz&lt;/td&gt;&lt;td&gt;default&lt;/td&gt;&lt;td&gt;/healthz&lt;/td&gt;&lt;td&gt;200 {&quot;status&quot;: &quot;ok&quot;}&lt;/td&gt;&lt;/tr&gt;&lt;tr style=&quot;background:#f5f5f5&quot;&gt;&lt;td&gt;TestAgainstRealGitHub.test_octocat_has_public_gists&lt;/td&gt;&lt;td&gt;&lt;i&gt;no fake — real API&lt;/i&gt;&lt;/td&gt;&lt;td&gt;/octocat&lt;/td&gt;&lt;td&gt;200, non-empty list, gist.github.com URLs&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;overflow=fill;" vertex="1" parent="1">
+          <mxGeometry x="20" y="790" width="1400" height="330" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
