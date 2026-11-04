@@ -6,7 +6,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Least privilege: read-only by default; jobs that publish images add packages: write.
+# Least privilege: read-only by default; jobs calling deploy.yml add packages: write.
 permissions:
   contents: read
 
@@ -82,10 +82,17 @@ jobs:
 
   build:
     needs: [lint, test]
-    runs-on: ubuntu-latest
+    # Publishing needs the self-hosted runner, which can reach localhost:5000.
+    # Pull requests never publish, so their code stays off that machine.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
     permissions:
       contents: read
-      packages: write
+    defaults:
+      run:
+        shell: bash # a Windows runner would otherwise use PowerShell
+    env:
+      # The self-hosted runner persists between runs, so names must not clash.
+      CONTAINER: gists-api-ci-${{ github.run_id }}
     outputs:
       image: ${{ steps.push.outputs.image }}
     steps:
@@ -100,7 +107,7 @@ jobs:
         run: docker build --target test .
 
       - name: Start container
-        run: docker run -d --name app -p 8080:8080 "$IMAGE"
+        run: docker run -d --name "$CONTAINER" -p 8080:8080 "$IMAGE"
 
       - name: Smoke test
         run: |
@@ -115,19 +122,22 @@ jobs:
 
       - name: Container logs
         if: always()
-        run: docker logs app || true
+        run: docker logs "$CONTAINER" || true
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f "$CONTAINER" || true
 
       # Only pushes and manual runs publish; pull requests stop at CI.
-      - name: Push image to GHCR
+      - name: Push image to local registry
         id: push
         if: github.event_name != 'pull_request'
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          repo="localhost:5000/gists-api"
           docker tag "$IMAGE" "$repo:${{ github.sha }}"
           docker push "$repo:${{ github.sha }}"
           # Deploys pull by digest, so a re-pushed tag can't change what ships.
-          # The image also carries a digest under its local name, so pick the GHCR one.
+          # The image also carries a digest under its local name, so pick the registry one.
           ref=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repo:${{ github.sha }}" | grep -m1 "^$repo@")
           echo "image=$ref" >> "$GITHUB_OUTPUT"
 
