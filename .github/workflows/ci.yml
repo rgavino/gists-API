@@ -157,7 +157,7 @@ jobs:
     secrets: inherit
 
     # Waits for approval if the prd environment has required reviewers.
-  deploy-uat:
+  deploy-prd:
     needs: [build, deploy-uat]
     uses: ./.github/workflows/deploy.yml
     permissions:
